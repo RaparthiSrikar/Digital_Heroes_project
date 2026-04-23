@@ -1,19 +1,16 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { createClient } from '@/utils/supabase/server';
 
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
+    const supabase = createClient(cookieStore);
 
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-    const decoded = verifyToken(token) as any;
-    if (!decoded || !decoded.id) {
+    if (authError || !authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -36,7 +33,7 @@ export async function POST(req: Request) {
 
     // Upsert subscription
     const existingSubscription = await prisma.subscription.findFirst({
-      where: { userId: decoded.id },
+      where: { userId: authUser.id },
     });
 
     if (existingSubscription) {
@@ -51,7 +48,7 @@ export async function POST(req: Request) {
     } else {
       await prisma.subscription.create({
         data: {
-          userId: decoded.id,
+          userId: authUser.id,
           plan,
           status: 'active',
           expiryDate,

@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { createClient } from '@/utils/supabase/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const decoded = verifyToken(token) as any;
-    if (!decoded?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const supabase = createClient(cookieStore);
+
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const { id: winnerId } = await params;
 
@@ -22,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     if (!winner) return NextResponse.json({ error: 'Winner record not found' }, { status: 404 });
-    if (winner.userId !== decoded.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (winner.userId !== authUser.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (winner.status !== 'pending') {
       return NextResponse.json({ error: 'This prize has already been processed' }, { status: 400 });
     }
@@ -31,6 +34,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     // Handle file upload
+    // NOTE: On Vercel, local file storage is ephemeral. 
+    // You should use Supabase Storage for production file uploads.
     const formData = await req.formData();
     const file = formData.get('proof') as File | null;
 

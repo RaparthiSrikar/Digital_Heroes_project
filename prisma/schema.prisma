@@ -8,10 +8,9 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(cuid())
+  id             String         @id
   name           String
   email          String         @unique
-  password       String
   role             String         @default("user") // "user" | "admin"
   charityId        String?
   charity          Charity?       @relation(fields: [charityId], references: [id])

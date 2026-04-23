@@ -1,16 +1,28 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { createClient } from '@/utils/supabase/server';
 
-// GET: All winners (admin view for verification)
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const decoded = verifyToken(token) as any;
-    if (!decoded || decoded.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const supabase = createClient(cookieStore);
+
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin in Prisma database
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    });
+
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 });
+    }
 
     const winners = await prisma.winner.findMany({
       orderBy: { createdAt: 'desc' },
@@ -26,14 +38,26 @@ export async function GET() {
   }
 }
 
-// PATCH: Approve or reject a winner's claim
 export async function PATCH(req: Request) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const decoded = verifyToken(token) as any;
-    if (!decoded || decoded.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const supabase = createClient(cookieStore);
+
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin in Prisma database
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { role: true }
+    });
+
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 });
+    }
 
     const { winnerId, action } = await req.json(); // action: "approve" | "reject"
 

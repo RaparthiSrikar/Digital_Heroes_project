@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
+    const supabase = createClient(cookieStore);
 
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const decoded = verifyToken(token) as any;
-    if (!decoded || !decoded.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const scores = await prisma.score.findMany({
-      where: { userId: decoded.id },
+      where: { userId: authUser.id },
       orderBy: { date: 'desc' },
       take: 5,
     });
@@ -28,11 +30,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
+    const supabase = createClient(cookieStore);
 
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const decoded = verifyToken(token) as any;
-    if (!decoded || !decoded.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const { score, date } = await req.json();
 
@@ -51,7 +55,7 @@ export async function POST(req: Request) {
 
     // Check for duplicate date
     const existingScores = await prisma.score.findMany({
-      where: { userId: decoded.id },
+      where: { userId: authUser.id },
       orderBy: { date: 'asc' },
     });
 
@@ -68,7 +72,7 @@ export async function POST(req: Request) {
     // Add new score
     await prisma.score.create({
       data: {
-        userId: decoded.id,
+        userId: authUser.id,
         score: numScore,
         date: scoreDate,
       },
@@ -76,10 +80,8 @@ export async function POST(req: Request) {
 
     // Enforce max 5 scores (delete oldest)
     if (existingScores.length >= 5) {
-      // existingScores is ordered by date asc, so [0] is the oldest
-      // Wait, we just added one, so there are length + 1 total
       const allScores = await prisma.score.findMany({
-        where: { userId: decoded.id },
+        where: { userId: authUser.id },
         orderBy: { date: 'asc' },
       });
 
