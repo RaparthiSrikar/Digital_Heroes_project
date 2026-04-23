@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id             String         @id @default(cuid())
+  name           String
+  email          String         @unique
+  password       String
+  role             String         @default("user") // "user" | "admin"
+  charityId        String?
+  charity          Charity?       @relation(fields: [charityId], references: [id])
+  charityPercentage Float         @default(0.10)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  subscriptions  Subscription[]
+  scores         Score[]
+  winners        Winner[]
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan        String   // "monthly" | "yearly"
+  status      String   // "active" | "expired" | "cancelled"
+  expiryDate  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Score {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score     Int
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model Draw {
+  id             String    @id @default(cuid())
+  month          String    // e.g., "2024-10"
+  winningNumbers String    // e.g., "12,23,34,45,5"
+  pool5          Float     @default(0)
+  pool4          Float     @default(0)
+  pool3          Float     @default(0)
+  createdAt      DateTime  @default(now())
+  winners        Winner[]
+}
+
+model Winner {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drawId      String
+  draw        Draw     @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  matchType   Int      // 3, 4, 5
+  status      String   // "pending" | "submitted" | "paid" | "rejected"
+  proofUrl    String?  // user uploads proof
+  prizeAmount Float    @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Charity {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  createdAt   DateTime @default(now())
+  users       User[]
+}
