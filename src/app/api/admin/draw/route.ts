@@ -76,7 +76,7 @@ export async function POST() {
     const match3Winners = [];
 
     for (const sub of activeSubscriptions) {
-      const userScores = sub.user.scores.map(s => s.score);
+      const userScores = sub.user.scores.map((s: { score: number }) => s.score);
       if (userScores.length === 5) {
         let matchCount = 0;
         for (const s of userScores) {
