@@ -16,7 +16,7 @@ function createPrismaClient(): PrismaClient {
   }
   const rawUrl = process.env.DATABASE_URL
   const relativePath = rawUrl.replace(/^file:/, '')
-  const absolutePath = path.resolve(process.cwd(), relativePath)
+  const absolutePath = path.resolve(/* turbopackIgnore: true */ process.cwd(), relativePath)
 
   const adapter = new PrismaBetterSqlite3({ url: absolutePath })
   return new PrismaClient({ adapter })
