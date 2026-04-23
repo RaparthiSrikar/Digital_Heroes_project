@@ -55,7 +55,7 @@ export async function POST(req: Request) {
       orderBy: { date: 'asc' },
     });
 
-    const hasDuplicateDate = existingScores.some(s => {
+    const hasDuplicateDate = existingScores.some((s: { date: Date }) => {
       const existingDate = new Date(s.date);
       existingDate.setHours(0, 0, 0, 0);
       return existingDate.getTime() === scoreDate.getTime();
